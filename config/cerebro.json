@@ -1,0 +1,40 @@
+{
+  "onboarding_feito": false,
+  "como_chamar_a_pessoa": "",
+  "idioma": "pt-BR",
+  "lente": "adler",
+  "tom": "direto, socrático, sem complacência",
+  "fase": "mapeamento",
+  "inicio_mapeamento": "",
+  "diagnostico": {
+    "dias_minimos": 30,
+    "dias_com_registro_minimos": 20,
+    "neuronios_minimos": 8,
+    "dias_sugeridos_maximos": 60
+  },
+  "vertentes": [
+    "trabalho e estudo",
+    "amizades",
+    "amor",
+    "família",
+    "corpo e saúde",
+    "sono",
+    "dinheiro",
+    "lazer e hobbies",
+    "propósito"
+  ],
+  "palavras_codigo": {},
+  "ferramenta_principal": "",
+  "modelos": {
+    "dia_a_dia": "",
+    "diagnostico": ""
+  },
+  "capacidades": {
+    "voz": false,
+    "lembrete_diario": false,
+    "varios_dispositivos": false,
+    "backup_git": false
+  },
+  "exemplos_apagados": false,
+  "criado_em": ""
+}

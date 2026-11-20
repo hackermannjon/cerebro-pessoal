@@ -1,0 +1,13 @@
+# segredos nunca entram no git
+.env*
+*.pem
+*.key
+segredos/
+# lixo de sistema
+.DS_Store
+Thumbs.db
+__pycache__/
+# arquivos locais do Claude Code (o settings.json do projeto entra; o local não)
+.claude/settings.local.json
+# o visualizador é gerado a partir dos neurônios (fica fora do git para não vazar o cérebro por engano)
+visualizador/dados.js

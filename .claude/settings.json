@@ -1,0 +1,11 @@
+{
+  "model": "sonnet",
+  "permissions": {
+    "deny": [
+      "Read(./**/.env*)",
+      "Read(./**/*.pem)",
+      "Read(./**/*.key)",
+      "Read(~/.ssh/**)"
+    ]
+  }
+}

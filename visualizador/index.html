@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Cérebro 3D</title>
+<style>
+  :root { --bg:#090b12; --ink:#e9ecf4; --muted:#9aa3b6; --line:#232a3d; --panel:#111624ee; --accent:#b9a4ff; }
+  * { box-sizing:border-box; }
+  html,body { margin:0; height:100%; background:var(--bg); color:var(--ink); font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; overflow:hidden; }
+  #cena { position:fixed; inset:0; }
+  header { position:fixed; top:14px; left:16px; right:16px; display:flex; gap:12px; align-items:flex-start; justify-content:space-between; pointer-events:none; }
+  header > * { pointer-events:auto; }
+  h1 { margin:0; font-size:20px; font-weight:650; letter-spacing:.2px; }
+  .sub { color:var(--muted); font-size:12.5px; }
+  #busca { background:#151b2b; color:var(--ink); border:1px solid var(--line); border-radius:8px; padding:7px 10px; font:inherit; width:min(240px, 42vw); }
+  .painel { position:fixed; background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:10px 12px; font-size:12px; backdrop-filter:blur(6px); }
+  #legenda { left:16px; bottom:16px; max-width:min(560px, calc(100vw - 32px)); }
+  #legenda .grupo { display:flex; flex-wrap:wrap; gap:4px 12px; margin:2px 0 6px; }
+  #legenda .grupo:last-child { margin-bottom:0; }
+  #legenda label, #legenda span.item { display:flex; align-items:center; gap:5px; cursor:pointer; white-space:nowrap; }
+  .bola { width:9px; height:9px; border-radius:50%; display:inline-block; flex:none; }
+  .traco { width:14px; height:3px; border-radius:2px; display:inline-block; flex:none; }
+  #info { right:16px; top:64px; width:min(360px, calc(100vw - 32px)); max-height:calc(100vh - 150px); overflow:auto; display:none; font-size:13px; }
+  #info h2 { margin:0 0 2px; font-size:17px; }
+  #info h3 { margin:12px 0 4px; font-size:11px; text-transform:uppercase; letter-spacing:.6px; color:var(--muted); font-weight:600; }
+  #info ul { margin:0; padding-left:16px; }
+  #info li { margin:3px 0; }
+  #info .resumo { color:#cfd5e4; margin:6px 0 0; }
+  #info a { color:var(--accent); cursor:pointer; text-decoration:none; }
+  #info a:hover { text-decoration:underline; }
+  .selo { display:inline-block; font-size:10.5px; font-weight:700; letter-spacing:.6px; padding:2px 7px; border-radius:20px; background:#ffcf5a22; color:#ffcf5a; border:1px solid #ffcf5a55; margin-left:6px; vertical-align:middle; }
+  #fechar { position:sticky; top:0; float:right; background:none; border:none; color:var(--muted); font-size:18px; cursor:pointer; padding:0 2px; }
+  #dica { position:fixed; pointer-events:none; background:#000d; padding:4px 8px; border-radius:6px; font-size:12px; display:none; }
+  #botoes { right:16px; bottom:16px; display:flex; gap:8px; }
+  button { background:#1b2236; color:var(--ink); border:1px solid var(--line); border-radius:8px; padding:6px 10px; font:inherit; font-size:12px; cursor:pointer; }
+  button:hover { background:#252e48; }
+  #aviso { position:fixed; inset:0; display:none; align-items:center; justify-content:center; padding:24px; text-align:center; }
+  #aviso div { max-width:520px; background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:20px; }
+  code { background:#1b2236; padding:1px 5px; border-radius:4px; }
+  @media (max-width: 700px) {
+    #info { top:auto; bottom:0; right:0; left:0; width:auto; max-height:55vh; border-radius:12px 12px 0 0; }
+    #legenda { display:none; }
+    header { flex-direction:column; }
+  }
+</style>
+</head>
+<body>
+<div id="cena"></div>
+<header>
+  <div>
+    <h1>Cérebro</h1>
+    <div class="sub" id="resumo">carregando...</div>
+  </div>
+  <input id="busca" type="search" placeholder="procurar neurônio..." autocomplete="off">
+</header>
+<div class="painel" id="legenda"><div class="grupo" id="lobos"></div><div class="grupo" id="tipos"></div></div>
+<div class="painel" id="info"><button id="fechar" title="fechar">×</button><div id="info-corpo"></div></div>
+<div class="painel" id="botoes"><button id="b-girar">Pausar giro</button><button id="b-voltar">Centralizar</button></div>
+<div id="dica"></div>
+<div id="aviso"><div id="aviso-texto"></div></div>
+
+<script src="dados.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+(function () {
+"use strict";
+const aviso = (html) => { document.getElementById("aviso-texto").innerHTML = html; document.getElementById("aviso").style.display = "flex"; };
+if (!window.THREE) { aviso("<b>Não consegui carregar o three.js.</b><br>O visualizador baixa a biblioteca 3D da internet na primeira vez. Confira a conexão e abra de novo."); return; }
+if (!window.CEREBRO) { aviso("<b>Faltam os dados do cérebro.</b><br>Abra pelo <code>abrir-cerebro</code> (ele gera os dados) ou rode<br><code>python3 ferramentas/cerebro.py visual</code><br>na pasta do repositório."); return; }
+
+const G = window.CEREBRO;
+const TIPO_COR = { causa:"#ff6b6b", contradiz:"#ffb547", suporta:"#4fd1a1", "depende-de":"#5aa9ff", "parte-de":"#b38cff", instancia:"#ff8fd1", relacionado:"#8a93a8", "diário":"#56607a" };
+const PALETA = ["#7cc4ff","#ffb86b","#7ee0a8","#ff7aa8","#c3a6ff","#ffd96b","#6be3e0","#ff9d7a","#a0e86b","#e0a6ff","#9fb4ff","#f7a8c8"];
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" }[c]));
+const md = (s) => esc(s).replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>").replace(/\[\[([^\]]+)\]\]/g, (m, id) => `<a data-id="${esc(id)}">${esc(id)}</a>`);
+
+// ---------- cena ----------
+const cena = new THREE.Scene();
+const cam = new THREE.PerspectiveCamera(42, innerWidth / innerHeight, 0.01, 100);
+const CAM0 = new THREE.Vector3(2.05, 0.55, 1.75);
+cam.position.copy(CAM0);
+const rend = new THREE.WebGLRenderer({ antialias:true, preserveDrawingBuffer:true });
+rend.setPixelRatio(Math.min(devicePixelRatio, 2));
+rend.setSize(innerWidth, innerHeight);
+rend.setClearColor(0x090b12);
+document.getElementById("cena").appendChild(rend.domElement);
+const ctl = new THREE.OrbitControls(cam, rend.domElement);
+ctl.enableDamping = true; ctl.autoRotate = true; ctl.autoRotateSpeed = 0.9;
+ctl.minDistance = 0.8; ctl.maxDistance = 7; ctl.target.set(0, -0.08, 0);
+
+// ---------- casca em forma de cérebro (procedural) ----------
+// eixos: x = esquerda/direita, y = cima, z = frente
+function ruga(x, y, z) {
+  return Math.sin(9.1 * x + 3.7 * Math.sin(6.3 * y) + 2.1 * Math.cos(5.2 * z))
+       * Math.cos(8.3 * z + 2.9 * Math.sin(7.7 * x))
+       + 0.5 * Math.sin(17 * y + 4 * Math.sin(9 * z));
+}
+const pos = [], cor = [];
+const base = new THREE.Color(0xc9b8ff), escuro = new THREE.Color(0x5b4f8c);
+function ponto(p, brilho) {
+  pos.push(p.x, p.y, p.z);
+  const c = escuro.clone().lerp(base, Math.max(0, Math.min(1, brilho)));
+  cor.push(c.r, c.g, c.b);
+}
+const N = 7000, ouro = Math.PI * (3 - Math.sqrt(5));
+for (const lado of [-1, 1]) {
+  for (let i = 0; i < N; i++) {
+    const y0 = 1 - (i / (N - 1)) * 2, r0 = Math.sqrt(1 - y0 * y0), th = ouro * i;
+    const d = new THREE.Vector3(Math.cos(th) * r0, y0, Math.sin(th) * r0);
+    const p = new THREE.Vector3(d.x * 0.43, d.y * 0.5, d.z * 0.76);
+    if (d.x * lado < 0) p.x *= 0.16;                                   // face medial achatada (a fissura)
+    if (p.y < -0.16) p.y = -0.16 + (p.y + 0.16) * 0.5;                  // base achatada
+    const lateral = Math.max(0, d.x * lado);
+    p.y -= 0.16 * Math.max(0, -d.y) * lateral * (d.z > -0.35 ? 1 : 0.25); // lobo temporal
+    p.z *= 1 - 0.12 * Math.max(0, -d.y);                                // frente mais estreita embaixo
+    const g = ruga(d.x * lado, d.y, d.z);
+    p.multiplyScalar(1 + 0.035 * g);
+    p.x += lado * 0.27; p.y += 0.06;
+    if (Math.abs(g) < 0.12 && Math.random() < 0.55) continue;           // sulcos: menos pontos
+    ponto(p, 0.35 + 0.45 * (g + 1) / 2);
+  }
+}
+// cerebelo
+for (let i = 0; i < 2600; i++) {
+  const y0 = 1 - (i / 2599) * 2, r0 = Math.sqrt(1 - y0 * y0), th = ouro * i;
+  const d = new THREE.Vector3(Math.cos(th) * r0, y0, Math.sin(th) * r0);
+  if (d.y > 0.55 && d.z > -0.2) continue;
+  const p = new THREE.Vector3(d.x * 0.34, d.y * 0.15, d.z * 0.21);
+  p.y += 0.01 * Math.sin(60 * d.y);
+  p.add(new THREE.Vector3(0, -0.24, -0.47));
+  ponto(p, 0.3 + 0.4 * (Math.sin(55 * d.y) + 1) / 2);
+}
+// tronco (onde moram os dias do diário)
+for (let i = 0; i < 900; i++) {
+  const t = i / 899, a = i * 2.39996, r = 0.085 - 0.025 * t;
+  ponto(new THREE.Vector3(Math.cos(a) * r, -0.22 - 0.62 * t, -0.22 - 0.1 * t + Math.sin(a) * r * 0.8), 0.25);
+}
+const cascaGeo = new THREE.BufferGeometry();
+cascaGeo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+cascaGeo.setAttribute("color", new THREE.Float32BufferAttribute(cor, 3));
+const casca = new THREE.Points(cascaGeo, new THREE.PointsMaterial({ size:0.011, vertexColors:true, transparent:true, opacity:0.42, depthWrite:false }));
+cena.add(casca);
+
+// ---------- posições dos neurônios (agrupados por lobo) ----------
+const ANCORAS = [
+  [-0.27, 0.2, 0.42], [0.27, 0.2, 0.42], [-0.28, 0.3, -0.12], [0.28, 0.3, -0.12],
+  [-0.4, -0.12, 0.14], [0.4, -0.12, 0.14], [-0.22, 0.1, -0.48], [0.22, 0.1, -0.48],
+  [-0.2, -0.02, 0.12], [0.2, -0.02, 0.12], [-0.3, 0.4, 0.16], [0.3, 0.4, 0.16],
+];
+const porLobo = {};
+for (const n of G.nodes) (porLobo[n.lobo] ||= []).push(n);
+const lobos = Object.keys(porLobo).sort((a, b) => porLobo[b].length - porLobo[a].length || a.localeCompare(b));
+const COR_LOBO = {};
+lobos.forEach((l, i) => {
+  COR_LOBO[l] = PALETA[i % PALETA.length];
+  const anc = ANCORAS[i % ANCORAS.length];
+  const camada = Math.floor(i / ANCORAS.length);
+  const lista = porLobo[l], m = lista.length, raio = 0.05 + 0.028 * Math.sqrt(m);
+  lista.forEach((n, k) => {
+    const yy = m === 1 ? 0 : 1 - (k / (m - 1)) * 2, rr = Math.sqrt(1 - yy * yy), a = ouro * k + i;
+    n.p = new THREE.Vector3(anc[0] + Math.cos(a) * rr * raio, anc[1] + yy * raio * 0.8 - camada * 0.06, anc[2] + Math.sin(a) * rr * raio);
+    n.cor = COR_LOBO[l];
+  });
+});
+const byId = Object.fromEntries(G.nodes.map((n) => [n.id, n]));
+
+// dias do diário no tronco
+const DIAS = Object.keys(G.dias || {}).sort();
+const diaNos = DIAS.map((d, i) => {
+  const t = DIAS.length === 1 ? 0.3 : i / (DIAS.length - 1), a = i * 2.39996;
+  return { id:"diario/" + d, nome:d, lobo:"diário", dia:true, links:G.dias[d],
+    p:new THREE.Vector3(Math.cos(a) * 0.05, -0.28 - 0.5 * t, -0.24 - 0.08 * t + Math.sin(a) * 0.04), cor:TIPO_COR["diário"] };
+});
+for (const d of diaNos) byId[d.id] = d;
+
+// ---------- esferas, halos e rótulos ----------
+const bolas = [], grupo = new THREE.Group(); cena.add(grupo);
+function rotulo(texto, cor) {
+  const c = document.createElement("canvas"), x = c.getContext("2d");
+  c.width = 512; c.height = 72;
+  x.font = "600 34px system-ui,-apple-system,Segoe UI,sans-serif"; x.textAlign = "center";
+  x.lineWidth = 8; x.strokeStyle = "rgba(9,11,18,.85)"; x.strokeText(texto, 256, 46);
+  x.fillStyle = cor; x.fillText(texto, 256, 46);
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map:new THREE.CanvasTexture(c), transparent:true, depthWrite:false, depthTest:false }));
+  s.scale.set(0.42, 0.059, 1);
+  return s;
+}
+for (const n of [...G.nodes, ...diaNos]) {
+  const r = n.dia ? 0.014 : 0.024 + Math.sqrt(n.grau || 0) * 0.006;
+  const m = new THREE.Mesh(new THREE.SphereGeometry(r, 20, 16), new THREE.MeshBasicMaterial({ color:n.cor, transparent:true }));
+  m.position.copy(n.p); m.userData = n; n.mesh = m; n.r = r;
+  const halo = new THREE.Mesh(new THREE.SphereGeometry(r * 2.1, 16, 12), new THREE.MeshBasicMaterial({ color:n.cor, transparent:true, opacity:0.13, depthWrite:false }));
+  m.add(halo); n.halo = halo;
+  if (!n.dia) { const s = rotulo(n.nome + (n.exemplo ? " (exemplo)" : ""), "#e9ecf4"); s.position.set(0, r + 0.045, 0); m.add(s); n.rot = s; }
+  grupo.add(m); bolas.push(m);
+}
+
+// ---------- sinapses (curvas) e sinais que correm por elas ----------
+const ligacoes = G.links.map((l) => ({ ...l }));
+for (const d of diaNos) for (const alvo of d.links) if (byId[alvo] && !byId[alvo].dia) ligacoes.push({ source:d.id, target:alvo, tipo:"diário" });
+const curvaDe = (a, b) => {
+  const meio = a.clone().add(b).multiplyScalar(0.5);
+  meio.multiplyScalar(0.55).add(new THREE.Vector3(0, 0.08, 0));
+  return new THREE.QuadraticBezierCurve3(a, meio, b);
+};
+const objTipo = {}, porTipo = {};
+for (const l of ligacoes) { l.curva = curvaDe(byId[l.source].p, byId[l.target].p); (porTipo[l.tipo] ||= []).push(l); }
+for (const [tipo, ls] of Object.entries(porTipo)) {
+  const pts = [];
+  for (const l of ls) { const q = l.curva.getPoints(24); for (let i = 0; i < q.length - 1; i++) pts.push(q[i].x, q[i].y, q[i].z, q[i + 1].x, q[i + 1].y, q[i + 1].z); }
+  const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(pts, 3));
+  const o = new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color:TIPO_COR[tipo] || "#8a93a8", transparent:true, opacity: tipo === "diário" ? 0.22 : tipo === "relacionado" ? 0.35 : 0.9, depthWrite:false }));
+  cena.add(o); objTipo[tipo] = o;
+}
+const sinais = ligacoes.filter((l) => l.tipo !== "diário").map((l, i) => ({ l, t:(i * 0.37) % 1, v:0.12 + (i % 5) * 0.03 }));
+const sinalGeo = new THREE.BufferGeometry();
+sinalGeo.setAttribute("position", new THREE.Float32BufferAttribute(new Float32Array(sinais.length * 3), 3));
+const sinalObj = new THREE.Points(sinalGeo, new THREE.PointsMaterial({ size:0.03, color:0xffffff, transparent:true, opacity:0.85, depthWrite:false }));
+cena.add(sinalObj);
+const destaque = new THREE.LineSegments(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ color:0xffffff, transparent:true, opacity:0.95 }));
+cena.add(destaque);
+
+// ---------- textos da página ----------
+const nEx = G.nodes.filter((n) => n.exemplo).length;
+document.getElementById("resumo").textContent =
+  `${G.nodes.length} neurônios em ${lobos.length} lobos · ${G.links.length} sinapses · ${DIAS.length} dias de diário` +
+  (nEx ? ` · ${nEx} de exemplo` : "") + (G.lente ? ` · lente: ${G.lente}` : "") + " · arraste para girar, clique num neurônio";
+const elLobos = document.getElementById("lobos");
+for (const l of lobos) elLobos.insertAdjacentHTML("beforeend", `<span class="item" data-lobo="${esc(l)}"><span class="bola" style="background:${COR_LOBO[l]}"></span>${esc(l)} (${porLobo[l].length})</span>`);
+if (DIAS.length) elLobos.insertAdjacentHTML("beforeend", `<span class="item"><span class="bola" style="background:${TIPO_COR["diário"]}"></span>diário, no tronco (${DIAS.length})</span>`);
+elLobos.addEventListener("click", (e) => { const l = e.target.closest("[data-lobo]")?.dataset.lobo; if (l) seleciona(porLobo[l][0]); });
+const elTipos = document.getElementById("tipos");
+for (const t of Object.keys(TIPO_COR)) {
+  if (!porTipo[t]) continue;
+  elTipos.insertAdjacentHTML("beforeend", `<label><input type="checkbox" checked data-t="${t}"><span class="traco" style="background:${TIPO_COR[t]}"></span>${t === "diário" ? "dia → neurônio" : t} (${porTipo[t].length})</label>`);
+}
+elTipos.addEventListener("change", (e) => { objTipo[e.target.dataset.t].visible = e.target.checked; });
+
+// ---------- seleção ----------
+const info = document.getElementById("info"), corpo = document.getElementById("info-corpo");
+const lista = (titulo, itens) => itens && itens.length ? `<h3>${titulo}</h3><ul>${itens.map((i) => `<li>${md(i)}</li>`).join("")}</ul>` : "";
+let sel = null, alvoCam = null;
+function seleciona(n) {
+  sel = n;
+  for (const b of bolas) { b.material.opacity = 1; b.userData.halo.material.opacity = 0.13; if (b.userData.rot) b.userData.rot.material.opacity = 1; }
+  destaque.geometry.dispose(); destaque.geometry = new THREE.BufferGeometry();
+  if (!n) { info.style.display = "none"; return; }
+  const ls = ligacoes.filter((l) => l.source === n.id || l.target === n.id);
+  const viz = new Set([n.id, ...ls.flatMap((l) => [l.source, l.target])]);
+  for (const b of bolas) {
+    const on = viz.has(b.userData.id);
+    b.material.opacity = on ? 1 : 0.14;
+    if (b.userData.rot) b.userData.rot.material.opacity = on ? 1 : 0.12;
+  }
+  n.halo.material.opacity = 0.35;
+  const pts = [];
+  for (const l of ls) { const q = l.curva.getPoints(24); for (let i = 0; i < q.length - 1; i++) pts.push(q[i].x, q[i].y, q[i].z, q[i + 1].x, q[i + 1].y, q[i + 1].z); }
+  destaque.geometry.setAttribute("position", new THREE.Float32BufferAttribute(pts, 3));
+  alvoCam = n.p.clone();
+  if (n.dia) {
+    corpo.innerHTML = `<h2>${esc(n.nome)}</h2><div class="sub">dia do diário · ${n.links.length} neurônios citados</div>` +
+      `<h3>Neurônios citados</h3><ul>${n.links.map((id) => `<li><a data-id="${esc(id)}">${esc(byId[id]?.nome || id)}</a></li>`).join("")}</ul>`;
+  } else {
+    const sin = (n.sinapses || []).map((s) => `<li><span class="traco" style="background:${TIPO_COR[s.tipo] || "#888"}"></span> <b>${esc(s.tipo)}</b> <a data-id="${esc(s.alvo)}">${esc(byId[s.alvo]?.nome || s.alvo)}</a><br><span class="sub">${md(s.motivo)}</span></li>`).join("");
+    corpo.innerHTML = `<h2>${esc(n.nome)}${n.exemplo ? '<span class="selo">EXEMPLO</span>' : ""}</h2>` +
+      `<div class="sub">lobo ${esc(n.lobo)} · ${n.grau} ligações${n.ultima ? " · último registro " + esc(n.ultima) : ""} · <code>cerebro/${esc(n.id)}.md</code></div>` +
+      (n.resumo ? `<p class="resumo">${md(n.resumo)}</p>` : "") +
+      lista("Fatos", n.fatos) + lista("Padrões observados", n.padroes) + lista("A investigar", n.investigar) + lista("Contradições", n.contradicoes) +
+      (sin ? `<h3>Sinapses</h3><ul style="list-style:none;padding-left:0">${sin}</ul>` : "");
+  }
+  info.style.display = "block"; info.scrollTop = 0;
+}
+corpo.addEventListener("click", (e) => { const id = e.target.closest("a[data-id]")?.dataset.id; if (id && byId[id]) seleciona(byId[id]); });
+document.getElementById("fechar").onclick = () => seleciona(null);
+
+const ray = new THREE.Raycaster(), mouse = new THREE.Vector2(), dica = document.getElementById("dica");
+function pega(ev) {
+  mouse.set((ev.clientX / innerWidth) * 2 - 1, -(ev.clientY / innerHeight) * 2 + 1);
+  ray.setFromCamera(mouse, cam);
+  return ray.intersectObjects(bolas, false)[0]?.object?.userData;
+}
+rend.domElement.addEventListener("pointermove", (ev) => {
+  const n = pega(ev);
+  rend.domElement.style.cursor = n ? "pointer" : "grab";
+  if (n) { dica.style.display = "block"; dica.style.left = ev.clientX + 12 + "px"; dica.style.top = ev.clientY + 10 + "px"; dica.textContent = n.dia ? `diário ${n.nome}` : `${n.nome} · ${n.lobo} · ${n.grau} ligações`; }
+  else dica.style.display = "none";
+});
+let desce = null;
+rend.domElement.addEventListener("pointerdown", (ev) => { desce = [ev.clientX, ev.clientY]; });
+rend.domElement.addEventListener("pointerup", (ev) => {
+  if (!desce || Math.hypot(ev.clientX - desce[0], ev.clientY - desce[1]) > 5) return;
+  seleciona(pega(ev) || null);
+});
+document.getElementById("busca").addEventListener("input", (e) => {
+  const q = e.target.value.trim().toLowerCase();
+  if (!q) return;
+  const n = G.nodes.find((x) => x.nome.toLowerCase().includes(q) || x.id.toLowerCase().includes(q));
+  if (n) seleciona(n);
+});
+document.getElementById("b-girar").onclick = (e) => { ctl.autoRotate = !ctl.autoRotate; e.target.textContent = ctl.autoRotate ? "Pausar giro" : "Girar"; };
+document.getElementById("b-voltar").onclick = () => { seleciona(null); alvoCam = new THREE.Vector3(0, -0.08, 0); cam.position.copy(CAM0); };
+addEventListener("resize", () => { cam.aspect = innerWidth / innerHeight; cam.updateProjectionMatrix(); rend.setSize(innerWidth, innerHeight); });
+// ?n=lobo/arquivo abre já com um neurônio selecionado; ?giro=0 começa parado
+const qs = new URLSearchParams(location.search);
+if (qs.get("giro") === "0") document.getElementById("b-girar").click();
+if (qs.get("n") && byId[qs.get("n")]) seleciona(byId[qs.get("n")]);
+
+// ---------- laço ----------
+const relogio = new THREE.Clock();
+(function loop() {
+  const dt = Math.min(relogio.getDelta(), 0.05), t = relogio.elapsedTime;
+  if (alvoCam) { ctl.target.lerp(alvoCam, 0.06); if (ctl.target.distanceTo(alvoCam) < 0.002) alvoCam = null; }
+  const arr = sinalGeo.attributes.position.array;
+  sinais.forEach((s, i) => { s.t = (s.t + s.v * dt) % 1; const p = s.l.curva.getPoint(s.t); arr[i * 3] = p.x; arr[i * 3 + 1] = p.y; arr[i * 3 + 2] = p.z; });
+  sinalGeo.attributes.position.needsUpdate = true;
+  for (const b of bolas) { const n = b.userData; b.scale.setScalar(1 + 0.08 * Math.sin(t * 2 + n.p.x * 9 + n.p.z * 7) + (n === sel ? 0.35 : 0)); }
+  casca.rotation.y = 0;
+  ctl.update(); rend.render(cena, cam);
+  requestAnimationFrame(loop);
+})();
+})();
+</script>
+</body>
+</html>
