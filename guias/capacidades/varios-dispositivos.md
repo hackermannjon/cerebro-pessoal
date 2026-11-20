@@ -29,3 +29,5 @@ Cada computador roda a própria sessão (Codex, Claude ou Gemini) nesta mesma pa
 
 ## Para desligar
 Tire a linha do AGENTS.md, ponha `false` no config e, no jeito B, desligue o servidor SSH na outra máquina.
+
+> **Registro:** tudo o que este passo a passo criar fora da pasta (agendamento, programa, modelo, pasta) vai antes para `estado/criados.md`, com o comando para desfazer. É o que o "apagar tudo" usa.

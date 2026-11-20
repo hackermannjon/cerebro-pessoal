@@ -20,3 +20,5 @@ Guardar esta pasta (com o cérebro) num repositório git PRIVADO, com histórico
 
 ## Para desligar
 Ponha `false` no config; o repositório continua existindo.
+
+> **Registro:** tudo o que este passo a passo criar fora da pasta (agendamento, programa, modelo, pasta) vai antes para `estado/criados.md`, com o comando para desfazer. É o que o "apagar tudo" usa.

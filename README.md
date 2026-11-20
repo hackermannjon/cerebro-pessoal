@@ -37,7 +37,8 @@ cerebro/
   <lobo>/<neuronio>.md os neurônios (ex.: saude/sono.md)
 analises/              diagnósticos
 dump/                  caixa de entrada: jogue arquivos aqui e diga "dump"
-guias/                 ONBOARDING, METODO, DIAGNOSTICO, COACH, MODELOS-E-CUSTOS, lentes/, capacidades/
+guias/                 ONBOARDING, METODO, DIAGNOSTICO, COACH, MODELOS-E-CUSTOS, APAGAR-TUDO, lentes/, capacidades/
+estado/criados.md      o que ele criou fora da pasta (para o "apagar tudo")
 ferramentas/cerebro.py status, checagem de sinapses, índice, grafo, dados do visualizador
 visualizador/index.html  o cérebro 3D
 abrir-cerebro.command  Mac  ·  abrir-cerebro.bat  Windows  ·  abrir-cerebro.sh  Linux
@@ -99,6 +100,16 @@ Consultado em 20/11/2026.
 
 - **Pedindo:** "muda a lente para estoicismo", "quero um lembrete às 22h", "cria um neurônio sobre X", "refaz o onboarding".
 - **Editando:** `config/cerebro.json` (lente, critérios do diagnóstico, áreas da vida, palavras-código); `AGENTS.md` (regras); `guias/lentes/` (crie a sua lente no mesmo formato); `guias/DIAGNOSTICO.md` e `guias/COACH.md` (como as fases funcionam).
+
+## Apagar tudo (botão de emergência)
+
+Escreva **"apague tudo"** na conversa (vale "apaga tudo" ou "delete tudo"; no Claude Code e no Gemini CLI também há o atalho `/apagar-tudo`). O Cérebro mostra o que vai sumir e pede para você responder **APAGAR**; qualquer outra resposta cancela. Confirmado, ele:
+
+1. desfaz o que criou fora da pasta e anotou em `estado/criados.md` (lembrete agendado, programas e modelos de voz que instalou, pastas);
+2. volta a pasta ao estado de recém-clonada (`git reset --hard` para a tag `origem-do-clone` + `git clean -fdx`; a pasta `.git` fica);
+3. lista, com o passo exato, o que só você pode apagar: o histórico das conversas na ferramenta (Claude Code, Codex, Gemini) e itens como um repositório de backup.
+
+Não use `/clear` para isso: é um comando da ferramenta que só limpa a conversa. Roteiro completo em [`guias/APAGAR-TUDO.md`](guias/APAGAR-TUDO.md).
 
 ## Privacidade
 

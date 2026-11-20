@@ -18,3 +18,5 @@ Um lembrete no horário escolhido: "conte o seu dia ao Cérebro". Sem IA rodando
 
 ## Para desligar
 Apague o evento ou o agendamento e ponha `false` no config.
+
+> **Registro:** tudo o que este passo a passo criar fora da pasta (agendamento, programa, modelo, pasta) vai antes para `estado/criados.md`, com o comando para desfazer. É o que o "apagar tudo" usa.

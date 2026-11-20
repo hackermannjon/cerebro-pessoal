@@ -1,0 +1,4 @@
+description = "Apagar tudo o que foi criado desde o clone (kill switch), com confirmação"
+prompt = """
+A pessoa pediu para apagar tudo. Leia `guias/APAGAR-TUDO.md` e siga o roteiro desde o passo 1. Não apague nada antes de ela responder APAGAR.
+"""
